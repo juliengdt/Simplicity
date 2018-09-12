@@ -60,9 +60,9 @@ public class Google: OAuth2 {
     override public func linkHandler(_ url: URL, callback: @escaping ExternalLoginCallback) {
         guard let authorizationCode = url.queryDictionary["code"], url.queryDictionary["state"] == state else {
             if let error = OAuth2Error.error(url.queryDictionary) ?? OAuth2Error.error(url.queryDictionary) {
-                callback(nil, error)
+                callback(nil, nil, error)
             } else {
-                callback(nil, LoginError.InternalSDKError)
+                callback(nil, nil, LoginError.InternalSDKError)
             }
             return
         }
@@ -83,11 +83,14 @@ public class Google: OAuth2 {
         request.httpBody = Helpers.queryString(requestParams)?.data(using: String.Encoding.utf8)
         
         let task = session.dataTask(with: request) { (data, response, error) -> Void in
-            guard let data = data, let json = (try? JSONSerialization.jsonObject(with: data, options: [])) as? [String: Any], let accessToken = json["access_token"] as? String else {
-                callback(nil, LoginError.InternalSDKError) // This request should not fail.
-                return
+            guard let data = data,
+                let json = (try? JSONSerialization.jsonObject(with: data, options: [])) as? [String: Any],
+                let idToken = json["id_token"] as? String,
+                let accessToken = json["access_token"] as? String else {
+                    callback(nil, nil, LoginError.InternalSDKError) // This request should not fail.
+                    return
             }
-            callback(accessToken, nil)
+            callback(idToken, accessToken, nil)
         }
         task.resume()
     }
